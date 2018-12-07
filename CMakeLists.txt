@@ -25,6 +25,5 @@ target_link_libraries(${FILE_TARGET} "glfw" "${GLFW_LIBRARIES}")
 target_include_directories(${FILE_TARGET} PRIVATE "${DIR_GLFW}/include")
 target_compile_definitions(${FILE_TARGET} PRIVATE "GLFW_INCLUDE_NONE")
 
-find_package(OpenGL REQUIRED)
-target_include_directories(${FILE_TARGET} PRIVATE ${OPENGL_INCLUDE_DIR})
-target_link_libraries(${FILE_TARGET} ${OPENGL_gl_LIBRARY})
+find_package(vulkan REQUIRED)
+target_link_libraries(${FILE_TARGET} Vulkan::Vulkan)

@@ -13,8 +13,8 @@ AllowAllParametersOfDeclarationOnNextLine: true
 AllowShortBlocksOnASingleLine: true
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Empty
-AllowShortIfStatementsOnASingleLine: true
-AllowShortLoopsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
 SortIncludes: false
 # ReturnTypeBreakingStyle: None
 AlwaysBreakBeforeMultilineStrings: false
@@ -26,7 +26,7 @@ BraceWrapping:
   AfterEnum: true
   AfterFunction: true
   AfterStruct: false
-  BeforeElse: false
+  BeforeElse: true
   SplitEmptyFunction: false
 # BinaryOperatorStyle: None
 # BraceBreakingStyle: Allman
