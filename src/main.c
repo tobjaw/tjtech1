@@ -211,6 +211,69 @@ int main(void)
         }
     }
 
+    /* physical device *******************************************************/
+    uint32_t devicesPhysicalCount = 0;
+    vkEnumeratePhysicalDevices(instance, &devicesPhysicalCount, NULL);
+
+    printf("found %d physical device(s)\n", devicesPhysicalCount);
+
+    if (devicesPhysicalCount == 0)
+    {
+        fprintf(stderr, "failed to find physical devices\n");
+        exit(EXIT_FAILURE);
+    }
+
+    VkPhysicalDevice devicesPhysical[devicesPhysicalCount];
+    vkEnumeratePhysicalDevices(instance, &devicesPhysicalCount, devicesPhysical);
+
+    VkPhysicalDevice devicePhysical = VK_NULL_HANDLE;
+    for (uint32_t i = 0; i < devicesPhysicalCount; ++i)
+    {
+
+        VkPhysicalDeviceProperties devicePhysicalProperties;
+        VkPhysicalDeviceFeatures   devicePhysicalFeatures;
+        vkGetPhysicalDeviceProperties(devicesPhysical[i], &devicePhysicalProperties);
+        vkGetPhysicalDeviceFeatures(devicesPhysical[i], &devicePhysicalFeatures);
+
+        if (devicePhysicalFeatures.shaderInt16)
+        {
+            devicePhysical = devicesPhysical[i];
+            break;
+        }
+    }
+
+    if (devicePhysical == VK_NULL_HANDLE)
+    {
+        fprintf(stderr, "failed to find suitable physical device\n");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        printf("found suitable physical device\n");
+    }
+
+    /* physical device queues ************************************************/
+    uint32_t devicePhysicalQueueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(devicePhysical, &devicePhysicalQueueFamilyCount, NULL);
+
+    printf("found %d physical device queue families\n", devicePhysicalQueueFamilyCount);
+
+    VkQueueFamilyProperties devicePhysicalQueueFamilies[devicePhysicalQueueFamilyCount];
+    vkGetPhysicalDeviceQueueFamilyProperties(
+        devicePhysical, &devicePhysicalQueueFamilyCount, devicePhysicalQueueFamilies);
+
+    int32_t devicePhysicalQueueIndex = -1;
+    for (uint32_t i = 0; i < devicePhysicalQueueFamilyCount; ++i)
+    {
+        if (devicePhysicalQueueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+        {
+            devicePhysicalQueueIndex = i;
+            break;
+        }
+    }
+
+    printf("using physical device queue with index %d\n", devicePhysicalQueueIndex);
+
 
     /*************************************************************************/
     /*                                 Window                                */
