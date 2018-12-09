@@ -7,15 +7,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-void error_glfw_callback(int error, const char *description)
+void error_glfw_callback(int error, const char* description)
 {
     fprintf(stderr, "Error (%d): %s\n", error, description);
 }
 
 VkBool32 vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
                            VkDebugUtilsMessageTypeFlagsEXT             messageTypes,
-                           const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-                           void *                                      pUserData)
+                           const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+                           void*                                       pUserData)
 {
 
     fprintf(stderr, "VK Validation: %s\n", pCallbackData->pMessage);
@@ -26,9 +26,12 @@ VkBool32 vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT      messageSe
 int main(void)
 {
 
+
     /***************************************************************************/
     /*                                GLFW Init                                */
     /***************************************************************************/
+
+
     glfwSetErrorCallback(error_glfw_callback);
 
     printf("Compiled against GLFW %i.%i.%i\n",
@@ -51,6 +54,7 @@ int main(void)
     /*                              Vulkan Init                              */
     /*************************************************************************/
 
+
     if (!glfwVulkanSupported())
     {
         fprintf(stderr, "Vulkan missing.\n");
@@ -59,15 +63,16 @@ int main(void)
 
     VkDebugUtilsMessengerEXT vkDebugUtilsMessengerEXT = NULL;
 
+
     /* validation layers *****************************************************/
-    const char *validationLayers[] = {"VK_LAYER_LUNARG_standard_validation"};
+
+    const char* validationLayers[] = {"VK_LAYER_LUNARG_standard_validation"};
 
 #ifdef NDEBUG
     const bool validationLayersEnable = false;
 #else
     const bool validationLayersEnable = true;
 #endif
-
 
     uint32_t validationLayersAvailableCount = 0;
     vkEnumerateInstanceLayerProperties(&validationLayersAvailableCount, NULL);
@@ -105,7 +110,9 @@ int main(void)
     printf("validation possible: %d\n", validationPossible);
     printf("validation enabled: %d\n", validationLayersEnable);
 
+
     /* app creation **********************************************************/
+
     VkApplicationInfo appInfo  = {};
     appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName   = "Hello Triangle";
@@ -114,14 +121,16 @@ int main(void)
     appInfo.engineVersion      = _VK_MAKE_VERSION(1u, 0u, 0u);
     appInfo.apiVersion         = _VK_MAKE_VERSION(1u, 0u, 0u);
 
+
     /* instance creation *****************************************************/
+
     VkInstanceCreateInfo instanceCreateInfo = {};
     instanceCreateInfo.sType                = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     instanceCreateInfo.flags                = 0;
     instanceCreateInfo.pApplicationInfo     = &appInfo;
 
     uint32_t     glfwExtensionCount = 0;
-    const char **glfwExtensions;
+    const char** glfwExtensions;
 
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
@@ -144,6 +153,7 @@ int main(void)
         exit(EXIT_FAILURE);
     }
 
+    /* layer injection */
     if (validationLayersEnable)
     {
         instanceCreateInfo.enabledLayerCount   = validationLayersLength;
@@ -153,7 +163,6 @@ int main(void)
     {
         instanceCreateInfo.enabledLayerCount = 0;
     }
-
 
     PFN_vkCreateInstance pfnCreateInstance =
         (PFN_vkCreateInstance) glfwGetInstanceProcAddress(NULL, "vkCreateInstance");
@@ -167,7 +176,9 @@ int main(void)
         exit(EXIT_FAILURE);
     }
 
+
     /* extensions check ******************************************************/
+
     uint32_t extensionsAvailableCount = 0;
     vkEnumerateInstanceExtensionProperties(NULL, &extensionsAvailableCount, NULL);
     printf("extensionsAvailableCount: %d\n", extensionsAvailableCount);
@@ -185,7 +196,9 @@ int main(void)
     /* PFN_vkCreateDevice pfnCreateDevice = */
     /*     (PFN_vkCreateDevice) glfwGetInstanceProcAddress(instance, "vkCreateDevice"); */
 
+
     /* debug extension *******************************************************/
+
     if (validationLayersEnable)
     {
         PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT;
@@ -211,7 +224,9 @@ int main(void)
         }
     }
 
+
     /* physical device *******************************************************/
+
     uint32_t devicesPhysicalCount = 0;
     vkEnumeratePhysicalDevices(instance, &devicesPhysicalCount, NULL);
 
@@ -252,7 +267,9 @@ int main(void)
         printf("found suitable physical device\n");
     }
 
+
     /* physical device queues ************************************************/
+
     uint32_t devicePhysicalQueueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(devicePhysical, &devicePhysicalQueueFamilyCount, NULL);
 
@@ -275,26 +292,89 @@ int main(void)
     printf("using physical device queue with index %d\n", devicePhysicalQueueIndex);
 
 
+    /* device ****************************************************************/
+
+    VkDevice device;
+
+    /* queue info */
+    VkDeviceQueueCreateInfo deviceQueueCreateInfo = {};
+    deviceQueueCreateInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    deviceQueueCreateInfo.queueFamilyIndex        = devicePhysicalQueueIndex;
+    deviceQueueCreateInfo.queueCount              = 1;
+
+    float deviceQueuePriority = 1.0f;
+
+    deviceQueueCreateInfo.pQueuePriorities = &deviceQueuePriority;
+
+    /* device features */
+    VkPhysicalDeviceFeatures deviceFeatures = {};
+
+    /* createInfo */
+    VkDeviceCreateInfo deviceCreateInfo   = {};
+    deviceCreateInfo.sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    deviceCreateInfo.pQueueCreateInfos    = &deviceQueueCreateInfo;
+    deviceCreateInfo.queueCreateInfoCount = 1;
+    deviceCreateInfo.pEnabledFeatures     = &deviceFeatures;
+
+    /* layer injection */
+    if (validationLayersEnable)
+    {
+        deviceCreateInfo.enabledLayerCount   = validationLayersLength;
+        deviceCreateInfo.ppEnabledLayerNames = validationLayers;
+    }
+    else
+    {
+        deviceCreateInfo.enabledLayerCount = 0;
+    }
+
+    /* create */
+    VkResult deviceCreateResult;
+    if ((deviceCreateResult = vkCreateDevice(devicePhysical, &deviceCreateInfo, NULL, &device)) !=
+        VK_SUCCESS)
+    {
+        fprintf(stderr, "Vulkan Device Creation Error: %d.\n", deviceCreateResult);
+        exit(EXIT_FAILURE);
+    }
+
+
+    /* grapicsQueue **********************************************************/
+
+    VkQueue graphicsQueue;
+    vkGetDeviceQueue(device, devicePhysicalQueueIndex, 0, &graphicsQueue);
+
+
     /*************************************************************************/
     /*                                 Window                                */
     /*************************************************************************/
+
+
+    /* window setup **********************************************************/
 
     glfwDefaultWindowHints();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-    GLFWwindow *window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, NULL, NULL);
     if (!window)
     {
+        /* XXX:  missing validation layer destruction  */
+        /* TODO: implement deconstructor  */
+        vkDestroyDevice(device, NULL);
         vkDestroyInstance(instance, NULL);
         glfwTerminate();
         exit(EXIT_FAILURE);
     }
 
+
+    /* draw loop *************************************************************/
+
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
     }
+
+
+    /* destruction ***********************************************************/
 
     if (validationLayersEnable)
     {
@@ -307,6 +387,7 @@ int main(void)
             vkDestroyDebugUtilsMessengerEXT(instance, vkDebugUtilsMessengerEXT, NULL);
         }
     }
+    vkDestroyDevice(device, NULL);
     vkDestroyInstance(instance, NULL);
     glfwDestroyWindow(window);
     glfwTerminate();
