@@ -175,19 +175,21 @@ int main(void)
     }
 
 
-    /* extensions check ******************************************************/
+    /* instanceExtensions check ******************************************************/
 
-    uint32_t extensionsAvailableCount = 0;
-    vkEnumerateInstanceExtensionProperties(NULL, &extensionsAvailableCount, NULL);
-    printf("extensionsAvailableCount: %d\n", extensionsAvailableCount);
+    uint32_t instanceExtensionsAvailableCount = 0;
+    vkEnumerateInstanceExtensionProperties(NULL, &instanceExtensionsAvailableCount, NULL);
+    printf("instanceExtensionsAvailableCount: %d\n", instanceExtensionsAvailableCount);
 
-    VkExtensionProperties extensionsAvailables[extensionsAvailableCount];
-    vkEnumerateInstanceExtensionProperties(NULL, &extensionsAvailableCount, extensionsAvailables);
+    VkExtensionProperties instanceExtensionsAvailables[instanceExtensionsAvailableCount];
+    vkEnumerateInstanceExtensionProperties(
+        NULL, &instanceExtensionsAvailableCount, instanceExtensionsAvailables);
 
-    for (uint8_t i = 0; i < extensionsAvailableCount; ++i)
+    for (uint8_t i = 0; i < instanceExtensionsAvailableCount; ++i)
     {
-        printf(
-            "%s %d\n", extensionsAvailables[i].extensionName, extensionsAvailables[i].specVersion);
+        printf("%s %d\n",
+               instanceExtensionsAvailables[i].extensionName,
+               instanceExtensionsAvailables[i].specVersion);
     }
 
 
@@ -224,11 +226,13 @@ int main(void)
 
 
     /* physical device *******************************************************/
+    const char*   devicePhysicalExtensionsRequired[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+    const uint8_t devicePhysicalExtensionsRequiredLength =
+        sizeof(devicePhysicalExtensionsRequired) / sizeof(devicePhysicalExtensionsRequired[0]);
 
     uint32_t devicesPhysicalCount = 0;
     vkEnumeratePhysicalDevices(instance, &devicesPhysicalCount, NULL);
 
-    printf("found %d physical device(s)\n", devicesPhysicalCount);
 
     if (devicesPhysicalCount == 0)
     {
@@ -239,16 +243,50 @@ int main(void)
     VkPhysicalDevice devicesPhysical[devicesPhysicalCount];
     vkEnumeratePhysicalDevices(instance, &devicesPhysicalCount, devicesPhysical);
 
+    printf("found %d physical device(s)\n", devicesPhysicalCount);
+
     VkPhysicalDevice devicePhysical = VK_NULL_HANDLE;
     for (uint32_t i = 0; i < devicesPhysicalCount; ++i)
     {
+        printf("  device %d:\n", i);
 
-        VkPhysicalDeviceProperties devicePhysicalProperties;
-        VkPhysicalDeviceFeatures   devicePhysicalFeatures;
-        vkGetPhysicalDeviceProperties(devicesPhysical[i], &devicePhysicalProperties);
+        uint32_t devicePhysicalExtensionsCount = 0;
+        vkEnumerateDeviceExtensionProperties(
+            devicesPhysical[i], NULL, &devicePhysicalExtensionsCount, NULL);
+
+        printf("    found %d physical device extension(s)\n", devicePhysicalExtensionsCount);
+
+        VkExtensionProperties devicePhysicalExtensions[devicePhysicalExtensionsCount];
+        vkEnumerateDeviceExtensionProperties(
+            devicesPhysical[i], NULL, &devicePhysicalExtensionsCount, devicePhysicalExtensions);
+
+        bool devicePhysicalExtensionsRequirementsMet = true;
+
+        for (uint8_t i = 0; i < devicePhysicalExtensionsRequiredLength; ++i)
+        {
+            bool devicePhysicalExtensionFound = false;
+            for (uint8_t j = 0; j < devicePhysicalExtensionsCount; ++j)
+            {
+                printf("      %s\n", devicePhysicalExtensions[j].extensionName);
+                if (strcmp(devicePhysicalExtensionsRequired[i],
+                           devicePhysicalExtensions[j].extensionName) == 0)
+                {
+                    devicePhysicalExtensionFound = true;
+                }
+            }
+
+            if (!devicePhysicalExtensionFound)
+            {
+                devicePhysicalExtensionsRequirementsMet = false;
+                break;
+            }
+        }
+
+        VkPhysicalDeviceFeatures devicePhysicalFeatures;
         vkGetPhysicalDeviceFeatures(devicesPhysical[i], &devicePhysicalFeatures);
 
-        if (devicePhysicalFeatures.shaderInt16)
+
+        if (devicePhysicalFeatures.shaderInt16 && devicePhysicalExtensionsRequirementsMet)
         {
             devicePhysical = devicesPhysical[i];
             break;
@@ -313,11 +351,13 @@ int main(void)
     VkPhysicalDeviceFeatures deviceFeatures = {};
 
     /* createInfo */
-    VkDeviceCreateInfo deviceCreateInfo   = {};
-    deviceCreateInfo.sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceCreateInfo.pQueueCreateInfos    = &deviceQueueCreateInfo;
-    deviceCreateInfo.queueCreateInfoCount = 1;
-    deviceCreateInfo.pEnabledFeatures     = &deviceFeatures;
+    VkDeviceCreateInfo deviceCreateInfo      = {};
+    deviceCreateInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    deviceCreateInfo.pQueueCreateInfos       = &deviceQueueCreateInfo;
+    deviceCreateInfo.queueCreateInfoCount    = 1;
+    deviceCreateInfo.pEnabledFeatures        = &deviceFeatures;
+    deviceCreateInfo.enabledExtensionCount   = 1;
+    deviceCreateInfo.ppEnabledExtensionNames = devicePhysicalExtensionsRequired;
 
     /* layer injection */
     if (validationLayersEnable)
