@@ -80,16 +80,15 @@ int main(void)
 
     uint32_t validationLayersAvailableCount = 0;
     vkEnumerateInstanceLayerProperties(&validationLayersAvailableCount, NULL);
-    printf("validationLayersAvailableCount: %d\n", validationLayersAvailableCount);
+    printf("found %d InstanceLayer(s)\n", validationLayersAvailableCount);
 
     VkLayerProperties validationLayersAvailable[validationLayersAvailableCount];
     vkEnumerateInstanceLayerProperties(&validationLayersAvailableCount, validationLayersAvailable);
 
     for (uint8_t i = 0; i < validationLayersAvailableCount; ++i)
     {
-        printf("%s %d\n",
-               validationLayersAvailable[i].layerName,
-               validationLayersAvailable[i].specVersion);
+        VkLayerProperties layer = validationLayersAvailable[i];
+        printf("  %s\n", layer.layerName);
     }
 
     bool    validationPossible     = true;
@@ -99,7 +98,9 @@ int main(void)
         bool validationLayerFound = false;
         for (uint8_t j = 0; j < validationLayersAvailableCount; ++j)
         {
-            if (strcmp(validationLayers[i], validationLayersAvailable[j].layerName) == 0)
+            const char* layerRequired = validationLayers[i];
+            const char* layer         = validationLayersAvailable[j].layerName;
+            if (strcmp(layerRequired, layer) == 0)
             {
                 validationLayerFound = true;
             }
@@ -111,8 +112,8 @@ int main(void)
             break;
         }
     }
-    printf("validation possible: %d\n", validationPossible);
-    printf("validation enabled: %d\n", validationLayersEnable);
+    printf("validation %s\n", validationPossible ? "possible" : "impossible");
+    printf("validation %s\n", validationLayersEnable ? "enabled" : "disabled");
 
 
     /* app creation **********************************************************/
@@ -182,10 +183,9 @@ int main(void)
 
 
     /* instanceExtensions check ******************************************************/
-
     uint32_t instanceExtensionsAvailableCount = 0;
     vkEnumerateInstanceExtensionProperties(NULL, &instanceExtensionsAvailableCount, NULL);
-    printf("instanceExtensionsAvailableCount: %d\n", instanceExtensionsAvailableCount);
+    printf("found %d InstanceExtensions(s)\n", instanceExtensionsAvailableCount);
 
     VkExtensionProperties instanceExtensionsAvailables[instanceExtensionsAvailableCount];
     vkEnumerateInstanceExtensionProperties(
@@ -193,18 +193,12 @@ int main(void)
 
     for (uint8_t i = 0; i < instanceExtensionsAvailableCount; ++i)
     {
-        printf("%s %d\n",
-               instanceExtensionsAvailables[i].extensionName,
-               instanceExtensionsAvailables[i].specVersion);
+        VkExtensionProperties ext = instanceExtensionsAvailables[i];
+        printf("  %s %d\n", ext.extensionName, ext.specVersion);
     }
 
 
-    /* PFN_vkCreateDevice pfnCreateDevice = */
-    /*     (PFN_vkCreateDevice) glfwGetInstanceProcAddress(instance, "vkCreateDevice"); */
-
-
     /* debug extension *******************************************************/
-
     if (validationLayersEnable)
     {
         PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT;
@@ -263,27 +257,29 @@ int main(void)
 
     printf("found %d physical device(s)\n", devicesPhysicalCount);
 
+    /* find suitable device **************************************************/
     VkPhysicalDevice devicePhysical = VK_NULL_HANDLE;
     for (uint32_t i = 0; i < devicesPhysicalCount; ++i)
     {
         printf("  device %d:\n", i);
+        VkPhysicalDevice device = devicesPhysical[i];
 
         /* device features */
         VkPhysicalDeviceFeatures devicePhysicalFeatures;
-        vkGetPhysicalDeviceFeatures(devicesPhysical[i], &devicePhysicalFeatures);
+        vkGetPhysicalDeviceFeatures(device, &devicePhysicalFeatures);
         if (!devicePhysicalFeatures.shaderInt16)
             continue;
 
+
         /* device extensions */
         uint32_t devicePhysicalExtensionsCount = 0;
-        vkEnumerateDeviceExtensionProperties(
-            devicesPhysical[i], NULL, &devicePhysicalExtensionsCount, NULL);
+        vkEnumerateDeviceExtensionProperties(device, NULL, &devicePhysicalExtensionsCount, NULL);
 
         printf("    found %d physical device extension(s)\n", devicePhysicalExtensionsCount);
 
         VkExtensionProperties devicePhysicalExtensions[devicePhysicalExtensionsCount];
         vkEnumerateDeviceExtensionProperties(
-            devicesPhysical[i], NULL, &devicePhysicalExtensionsCount, devicePhysicalExtensions);
+            device, NULL, &devicePhysicalExtensionsCount, devicePhysicalExtensions);
 
         bool devicePhysicalExtensionsRequirementsMet = true;
 
@@ -292,9 +288,10 @@ int main(void)
             bool devicePhysicalExtensionFound = false;
             for (uint8_t j = 0; j < devicePhysicalExtensionsCount; ++j)
             {
-                printf("      %s\n", devicePhysicalExtensions[j].extensionName);
-                if (strcmp(devicePhysicalExtensionsRequired[i],
-                           devicePhysicalExtensions[j].extensionName) == 0)
+                const char* extRequired = devicePhysicalExtensionsRequired[i];
+                const char* ext         = devicePhysicalExtensions[j].extensionName;
+                printf("      %s\n", ext);
+                if (strcmp(extRequired, ext) == 0)
                 {
                     devicePhysicalExtensionFound = true;
                 }
@@ -310,6 +307,7 @@ int main(void)
         if (!devicePhysicalExtensionsRequirementsMet)
             continue;
 
+
         /* swapchain details */
         struct SwapChainSupportDetails
         {
@@ -319,50 +317,50 @@ int main(void)
         } swapChainSupportDetails;
 
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-            devicesPhysical[i], surface, &swapChainSupportDetails.capabilities);
+            device, surface, &swapChainSupportDetails.capabilities);
 
         uint32_t formatCount;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(devicesPhysical[i], surface, &formatCount, NULL);
-
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, NULL);
+        printf("    found %d format(s)\n", formatCount);
 
         if (formatCount != 0)
         {
             swapChainSupportDetails.formats =
                 (malloc((size_t)(formatCount * sizeof(swapChainSupportDetails.formats))));
             vkGetPhysicalDeviceSurfaceFormatsKHR(
-                devicesPhysical[i], surface, &formatCount, swapChainSupportDetails.formats);
+                device, surface, &formatCount, swapChainSupportDetails.formats);
         }
 
         for (uint32_t i = 0; i < formatCount; ++i)
         {
-            printf("format: %d\n", swapChainSupportDetails.formats[i].format);
+            VkSurfaceFormatKHR format = swapChainSupportDetails.formats[i];
+            printf("      %d\n", format.format);
         }
 
         uint32_t presentModeCount;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(
-            devicesPhysical[i], surface, &presentModeCount, NULL);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, NULL);
+        printf("    found %d present mode(s)\n", presentModeCount);
 
         if (presentModeCount != 0)
         {
             swapChainSupportDetails.presentModes =
                 (malloc((size_t)(presentModeCount * sizeof(swapChainSupportDetails.presentModes))));
-            vkGetPhysicalDeviceSurfacePresentModesKHR(devicesPhysical[i],
-                                                      surface,
-                                                      &presentModeCount,
-                                                      swapChainSupportDetails.presentModes);
+            vkGetPhysicalDeviceSurfacePresentModesKHR(
+                device, surface, &presentModeCount, swapChainSupportDetails.presentModes);
         }
 
         for (uint32_t i = 0; i < presentModeCount; ++i)
         {
-            printf("present mode: %d\n", swapChainSupportDetails.presentModes[i]);
+            VkPresentModeKHR mode = swapChainSupportDetails.presentModes[i];
+            printf("      %d\n", mode);
         }
-
 
         if (formatCount == 0 || presentModeCount == 0)
             continue;
 
+
         /* found device */
-        devicePhysical = devicesPhysical[i];
+        devicePhysical = device;
         break;
     }
 
@@ -373,7 +371,7 @@ int main(void)
     }
     else
     {
-        printf("found suitable physical device\n");
+        printf("    suitable physical device\n");
     }
 
 
@@ -393,9 +391,10 @@ int main(void)
     int32_t devicePhysicalQueueGraphicsIndex = -1;
     for (uint32_t i = 0; i < devicePhysicalQueueGraphicsFamilyCount; ++i)
     {
+        VkQueueFamilyProperties family = devicePhysicalQueueGraphicsFamilies[i];
         /* VkBool32 presentSupport = false; */
         /* vkGetPhysicalDeviceSurfaceSupportKHR(devicePhysical, i, surface, &presentSupport); */
-        if (devicePhysicalQueueGraphicsFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+        if (family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
         {
             devicePhysicalQueueGraphicsIndex = i;
             break;
