@@ -26,10 +26,9 @@ VkBool32 vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT      messageSe
 int main(void)
 {
     /***************************************************************************/
-    /*                                GLFW Init                                */
+    /*                                   GLFW                                  */
     /***************************************************************************/
-
-
+    /* init ********************************************************************/
     glfwSetErrorCallback(error_glfw_callback);
 
     printf("Compiled against GLFW %i.%i.%i\n",
@@ -46,6 +45,13 @@ int main(void)
     }
 
     printf("glfw init\n");
+
+    /* window create **********************************************************/
+    glfwDefaultWindowHints();
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
+    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, NULL, NULL);
 
 
     /*************************************************************************/
@@ -225,6 +231,18 @@ int main(void)
     }
 
 
+    /* surface ***************************************************************/
+    VkSurfaceKHR surface;
+
+    VkResult surfaceCreateResult;
+    if ((surfaceCreateResult = glfwCreateWindowSurface(instance, window, NULL, &surface)) !=
+        VK_SUCCESS)
+    {
+        fprintf(stderr, "Vulkan Surface Creation Error: %d.\n", surfaceCreateResult);
+        exit(EXIT_FAILURE);
+    }
+
+
     /* physical device *******************************************************/
     const char*   devicePhysicalExtensionsRequired[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
     const uint8_t devicePhysicalExtensionsRequiredLength =
@@ -250,6 +268,13 @@ int main(void)
     {
         printf("  device %d:\n", i);
 
+        /* device features */
+        VkPhysicalDeviceFeatures devicePhysicalFeatures;
+        vkGetPhysicalDeviceFeatures(devicesPhysical[i], &devicePhysicalFeatures);
+        if (!devicePhysicalFeatures.shaderInt16)
+            continue;
+
+        /* device extensions */
         uint32_t devicePhysicalExtensionsCount = 0;
         vkEnumerateDeviceExtensionProperties(
             devicesPhysical[i], NULL, &devicePhysicalExtensionsCount, NULL);
@@ -282,15 +307,63 @@ int main(void)
             }
         }
 
-        VkPhysicalDeviceFeatures devicePhysicalFeatures;
-        vkGetPhysicalDeviceFeatures(devicesPhysical[i], &devicePhysicalFeatures);
+        if (!devicePhysicalExtensionsRequirementsMet)
+            continue;
 
-
-        if (devicePhysicalFeatures.shaderInt16 && devicePhysicalExtensionsRequirementsMet)
+        /* swapchain details */
+        struct SwapChainSupportDetails
         {
-            devicePhysical = devicesPhysical[i];
-            break;
+            VkSurfaceCapabilitiesKHR capabilities;
+            VkSurfaceFormatKHR*      formats;
+            VkPresentModeKHR*        presentModes;
+        } swapChainSupportDetails;
+
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+            devicesPhysical[i], surface, &swapChainSupportDetails.capabilities);
+
+        uint32_t formatCount;
+        vkGetPhysicalDeviceSurfaceFormatsKHR(devicesPhysical[i], surface, &formatCount, NULL);
+
+
+        if (formatCount != 0)
+        {
+            swapChainSupportDetails.formats =
+                (malloc((size_t)(formatCount * sizeof(swapChainSupportDetails.formats))));
+            vkGetPhysicalDeviceSurfaceFormatsKHR(
+                devicesPhysical[i], surface, &formatCount, swapChainSupportDetails.formats);
         }
+
+        for (uint32_t i = 0; i < formatCount; ++i)
+        {
+            printf("format: %d\n", swapChainSupportDetails.formats[i].format);
+        }
+
+        uint32_t presentModeCount;
+        vkGetPhysicalDeviceSurfacePresentModesKHR(
+            devicesPhysical[i], surface, &presentModeCount, NULL);
+
+        if (presentModeCount != 0)
+        {
+            swapChainSupportDetails.presentModes =
+                (malloc((size_t)(presentModeCount * sizeof(swapChainSupportDetails.presentModes))));
+            vkGetPhysicalDeviceSurfacePresentModesKHR(devicesPhysical[i],
+                                                      surface,
+                                                      &presentModeCount,
+                                                      swapChainSupportDetails.presentModes);
+        }
+
+        for (uint32_t i = 0; i < presentModeCount; ++i)
+        {
+            printf("present mode: %d\n", swapChainSupportDetails.presentModes[i]);
+        }
+
+
+        if (formatCount == 0 || presentModeCount == 0)
+            continue;
+
+        /* found device */
+        devicePhysical = devicesPhysical[i];
+        break;
     }
 
     if (devicePhysical == VK_NULL_HANDLE)
@@ -305,7 +378,6 @@ int main(void)
 
 
     /* physical device queues ************************************************/
-
     uint32_t devicePhysicalQueueGraphicsFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(
         devicePhysical, &devicePhysicalQueueGraphicsFamilyCount, NULL);
@@ -334,7 +406,6 @@ int main(void)
 
 
     /* device ****************************************************************/
-
     VkDevice device;
 
     /* queue info */
@@ -380,39 +451,6 @@ int main(void)
     }
 
 
-    /* grapicsQueue **********************************************************/
-
-    VkQueue graphicsQueue;
-    vkGetDeviceQueue(device, devicePhysicalQueueGraphicsIndex, 0, &graphicsQueue);
-
-
-    /*************************************************************************/
-    /*                            Surface & Window                           */
-    /*************************************************************************/
-    /* surface ***************************************************************/
-    VkSurfaceKHR surface;
-
-    glfwDefaultWindowHints();
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, NULL, NULL);
-
-    VkResult surfaceCreateResult;
-    if ((surfaceCreateResult = glfwCreateWindowSurface(instance, window, NULL, &surface)) !=
-        VK_SUCCESS)
-    {
-        fprintf(stderr, "Vulkan Surface Creation Error: %d.\n", surfaceCreateResult);
-        exit(EXIT_FAILURE);
-    }
-
-    /* TODO: actually check for present queue */
-    int32_t devicePhysicalQueuePresentIndex = devicePhysicalQueueGraphicsIndex;
-
-    /* present queue *********************************************************/
-    VkQueue presentQueue;
-    vkGetDeviceQueue(device, devicePhysicalQueuePresentIndex, 0, &presentQueue);
-
     /* window check **********************************************************/
     if (!window)
     {
@@ -426,15 +464,33 @@ int main(void)
     }
 
 
-    /* draw loop *************************************************************/
+    /* grapicsQueue **********************************************************/
+    VkQueue graphicsQueue;
+    vkGetDeviceQueue(device, devicePhysicalQueueGraphicsIndex, 0, &graphicsQueue);
 
+    /* TODO: actually check for present queue */
+    int32_t devicePhysicalQueuePresentIndex = devicePhysicalQueueGraphicsIndex;
+
+
+    /* present queue *********************************************************/
+    VkQueue presentQueue;
+    vkGetDeviceQueue(device, devicePhysicalQueuePresentIndex, 0, &presentQueue);
+
+
+    /*************************************************************************/
+    /*                                  Main                                 */
+    /*************************************************************************/
+    /* draw loop *************************************************************/
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
     }
 
 
-    /* destruction ***********************************************************/
+    /*************************************************************************/
+    /*                                Destroy                                */
+    /*************************************************************************/
+
 
     if (validationLayersEnable)
     {
