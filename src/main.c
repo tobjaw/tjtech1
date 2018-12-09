@@ -259,6 +259,18 @@ int main(void)
 
     /* find suitable device **************************************************/
     VkPhysicalDevice devicePhysical = VK_NULL_HANDLE;
+    /* swapchain query details */
+    struct SwapChainDetails
+    {
+        VkSurfaceCapabilitiesKHR capabilities;
+        VkSurfaceFormatKHR*      formats;
+        uint32_t                 formatsCount;
+        /* VkSurfaceFormatKHR       formatSelected; */
+        VkPresentModeKHR* presentModes;
+        uint32_t          presentModesCount;
+        /* VkPresentModeKHR         presentModeSelected; */
+    } swapChainDetails;
+
     for (uint32_t i = 0; i < devicesPhysicalCount; ++i)
     {
         printf("  device %d:\n", i);
@@ -308,54 +320,46 @@ int main(void)
             continue;
 
 
-        /* swapchain details */
-        struct SwapChainSupportDetails
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &swapChainDetails.capabilities);
+
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &swapChainDetails.formatsCount, NULL);
+        printf("    found %d format(s)\n", swapChainDetails.formatsCount);
+
+        if (swapChainDetails.formatsCount != 0)
         {
-            VkSurfaceCapabilitiesKHR capabilities;
-            VkSurfaceFormatKHR*      formats;
-            VkPresentModeKHR*        presentModes;
-        } swapChainSupportDetails;
-
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-            device, surface, &swapChainSupportDetails.capabilities);
-
-        uint32_t formatCount;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, NULL);
-        printf("    found %d format(s)\n", formatCount);
-
-        if (formatCount != 0)
-        {
-            swapChainSupportDetails.formats =
-                (malloc((size_t)(formatCount * sizeof(swapChainSupportDetails.formats))));
+            swapChainDetails.formats = (malloc(
+                (size_t)(swapChainDetails.formatsCount * sizeof(swapChainDetails.formats))));
             vkGetPhysicalDeviceSurfaceFormatsKHR(
-                device, surface, &formatCount, swapChainSupportDetails.formats);
+                device, surface, &swapChainDetails.formatsCount, swapChainDetails.formats);
         }
 
-        for (uint32_t i = 0; i < formatCount; ++i)
+        for (uint32_t i = 0; i < swapChainDetails.formatsCount; ++i)
         {
-            VkSurfaceFormatKHR format = swapChainSupportDetails.formats[i];
-            printf("      %d\n", format.format);
+            VkSurfaceFormatKHR format = swapChainDetails.formats[i];
+            printf("      format=%d, colorSpace=%d\n", format.format, format.colorSpace);
         }
 
-        uint32_t presentModeCount;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, NULL);
-        printf("    found %d present mode(s)\n", presentModeCount);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(
+            device, surface, &swapChainDetails.presentModesCount, NULL);
+        printf("    found %d present mode(s)\n", swapChainDetails.presentModesCount);
 
-        if (presentModeCount != 0)
+        if (swapChainDetails.presentModesCount != 0)
         {
-            swapChainSupportDetails.presentModes =
-                (malloc((size_t)(presentModeCount * sizeof(swapChainSupportDetails.presentModes))));
-            vkGetPhysicalDeviceSurfacePresentModesKHR(
-                device, surface, &presentModeCount, swapChainSupportDetails.presentModes);
+            swapChainDetails.presentModes = (malloc((size_t)(
+                swapChainDetails.presentModesCount * sizeof(swapChainDetails.presentModes))));
+            vkGetPhysicalDeviceSurfacePresentModesKHR(device,
+                                                      surface,
+                                                      &swapChainDetails.presentModesCount,
+                                                      swapChainDetails.presentModes);
         }
 
-        for (uint32_t i = 0; i < presentModeCount; ++i)
+        for (uint32_t i = 0; i < swapChainDetails.presentModesCount; ++i)
         {
-            VkPresentModeKHR mode = swapChainSupportDetails.presentModes[i];
+            VkPresentModeKHR mode = swapChainDetails.presentModes[i];
             printf("      %d\n", mode);
         }
 
-        if (formatCount == 0 || presentModeCount == 0)
+        if (swapChainDetails.formatsCount == 0 || swapChainDetails.presentModesCount == 0)
             continue;
 
 
@@ -375,6 +379,107 @@ int main(void)
     }
 
 
+    /* swapChain config format ***********************************************/
+    VkSurfaceFormatKHR swapChainConfigFormat      = {};
+    bool               swapChainConfigFormatFound = false;
+    printf("swapChain\n  %d available format(s)\n", swapChainDetails.formatsCount);
+
+    if (swapChainDetails.formatsCount == 1 &&
+        swapChainDetails.formats[0].format == VK_FORMAT_UNDEFINED)
+    {
+        swapChainConfigFormat.format     = VK_FORMAT_B8G8R8A8_UNORM;
+        swapChainConfigFormat.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        swapChainConfigFormatFound       = true;
+    }
+    else
+    {
+        for (uint32_t i = 0; i < swapChainDetails.formatsCount; ++i)
+        {
+            VkSurfaceFormatKHR formatKHR  = swapChainDetails.formats[i];
+            VkFormat           format     = formatKHR.format;
+            VkColorSpaceKHR    colorSpace = formatKHR.colorSpace;
+
+            if (format == VK_FORMAT_B8G8R8A8_UNORM &&
+                colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR)
+            {
+                swapChainConfigFormat      = formatKHR;
+                swapChainConfigFormatFound = true;
+            }
+        }
+    }
+
+    if (!swapChainConfigFormatFound)
+    {
+        swapChainConfigFormat = swapChainDetails.formats[0];
+        printf("    using fallback\n");
+    }
+
+    printf("    using format %d\n", swapChainConfigFormat.format);
+    printf("    using colorSpace %d\n", swapChainConfigFormat.colorSpace);
+
+
+    /* swapChain config presentMode ******************************************/
+    VkPresentModeKHR swapChainConfigPresentMode      = VK_PRESENT_MODE_FIFO_KHR;    // VSYNC
+    bool             swapChainConfigPresentModeFound = false;
+    printf("  %d available present mode(s)\n", swapChainDetails.presentModesCount);
+
+    for (uint32_t i = 0; i < swapChainDetails.presentModesCount; ++i)
+    {
+        VkPresentModeKHR modeKHR = swapChainDetails.presentModes[i];
+        // prefer tripple buffering
+        if (modeKHR == VK_PRESENT_MODE_MAILBOX_KHR)
+        {
+            swapChainConfigPresentMode      = modeKHR;
+            swapChainConfigPresentModeFound = true;
+        }
+    }
+
+    for (uint32_t i = 0; i < swapChainDetails.presentModesCount; ++i)
+    {
+        VkPresentModeKHR modeKHR = swapChainDetails.presentModes[i];
+        // NO VSYNC
+        if (modeKHR == VK_PRESENT_MODE_IMMEDIATE_KHR)
+        {
+            swapChainConfigPresentMode      = modeKHR;
+            swapChainConfigPresentModeFound = true;
+        }
+    }
+
+    if (!swapChainConfigPresentModeFound)
+    {
+        printf("    using fallback\n");
+    }
+
+    printf("    using present mode %d\n", swapChainConfigPresentMode);
+
+
+    /* swapChain config swapExtent *******************************************/
+    VkExtent2D swapChainConfigExtent = swapChainDetails.capabilities.currentExtent;
+
+    if (swapChainConfigExtent.width == UINT32_MAX)
+    {
+        VkExtent2D swapChainConfigExtentMax = swapChainDetails.capabilities.maxImageExtent;
+        VkExtent2D swapChainConfigExtentMin = swapChainDetails.capabilities.minImageExtent;
+
+        swapChainConfigExtent.width = swapChainConfigExtentMax.width < WINDOW_WIDTH
+                                          ? swapChainConfigExtentMax.width
+                                          : WINDOW_WIDTH;
+        swapChainConfigExtent.height = swapChainConfigExtentMax.height < WINDOW_HEIGHT
+                                           ? swapChainConfigExtentMax.height
+                                           : WINDOW_HEIGHT;
+        swapChainConfigExtent.width = swapChainConfigExtentMin.width > swapChainConfigExtent.width
+                                          ? swapChainConfigExtentMin.width
+                                          : swapChainConfigExtent.width;
+        swapChainConfigExtent.height =
+            swapChainConfigExtentMin.height > swapChainConfigExtent.height
+                ? swapChainConfigExtentMin.height
+                : swapChainConfigExtent.height;
+    }
+
+    printf("  currentExtent\n    res: %dx%d\n",
+           swapChainConfigExtent.width,
+           swapChainConfigExtent.height);
+
     /* physical device queues ************************************************/
     uint32_t devicePhysicalQueueGraphicsFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(
@@ -392,16 +497,34 @@ int main(void)
     for (uint32_t i = 0; i < devicePhysicalQueueGraphicsFamilyCount; ++i)
     {
         VkQueueFamilyProperties family = devicePhysicalQueueGraphicsFamilies[i];
-        /* VkBool32 presentSupport = false; */
-        /* vkGetPhysicalDeviceSurfaceSupportKHR(devicePhysical, i, surface, &presentSupport); */
+
         if (family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
         {
             devicePhysicalQueueGraphicsIndex = i;
             break;
         }
     }
+    printf("using physical device queue graphics with index %d\n",
+           devicePhysicalQueueGraphicsIndex);
 
-    printf("using physical device queue with index %d\n", devicePhysicalQueueGraphicsIndex);
+    int32_t devicePhysicalQueuePresentIndex = -1;
+    for (uint32_t i = 0; i < devicePhysicalQueueGraphicsFamilyCount; ++i)
+    {
+        VkBool32 presentSupport = false;
+        VkResult deviceSurfaceSupportResult;
+        if ((deviceSurfaceSupportResult =
+                 vkGetPhysicalDeviceSurfaceSupportKHR(
+                     devicePhysical, i, surface, &presentSupport) == VK_SUCCESS))
+        {
+            devicePhysicalQueuePresentIndex = i;
+            break;
+        }
+    }
+    printf("using physical device queue present with index %d\n", devicePhysicalQueuePresentIndex);
+
+
+    /* TODO: actually check for present queue */
+    /* int32_t devicePhysicalQueuePresentIndex = devicePhysicalQueueGraphicsIndex; */
 
 
     /* device ****************************************************************/
@@ -450,6 +573,74 @@ int main(void)
     }
 
 
+    /* grapicsQueue **********************************************************/
+    VkQueue graphicsQueue;
+    vkGetDeviceQueue(device, devicePhysicalQueueGraphicsIndex, 0, &graphicsQueue);
+
+
+    /* present queue *********************************************************/
+    VkQueue presentQueue;
+    vkGetDeviceQueue(device, devicePhysicalQueuePresentIndex, 0, &presentQueue);
+
+
+    /* swapChain creation ****************************************************/
+    uint32_t imageCount = swapChainDetails.capabilities.minImageCount + 1;
+    if (swapChainDetails.capabilities.maxImageCount > 0 &&
+        imageCount > swapChainDetails.capabilities.maxImageCount)
+    {
+        imageCount = swapChainDetails.capabilities.maxImageCount;
+    }
+
+    VkSwapchainCreateInfoKHR createInfo = {};
+    createInfo.sType                    = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    createInfo.surface                  = surface;
+
+    createInfo.minImageCount    = imageCount;
+    createInfo.imageFormat      = swapChainConfigFormat.format;
+    createInfo.imageColorSpace  = swapChainConfigFormat.colorSpace;
+    createInfo.imageExtent      = swapChainConfigExtent;
+    createInfo.imageArrayLayers = 1;
+    createInfo.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    if (devicePhysicalQueueGraphicsIndex != devicePhysicalQueuePresentIndex)
+    {
+        uint32_t pQueueFamilyIndices[2];
+        pQueueFamilyIndices[0]           = devicePhysicalQueueGraphicsIndex;
+        pQueueFamilyIndices[1]           = devicePhysicalQueuePresentIndex;
+        createInfo.pQueueFamilyIndices   = pQueueFamilyIndices;
+        createInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
+        createInfo.queueFamilyIndexCount = 2;
+    }
+    else
+    {
+        createInfo.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
+        createInfo.queueFamilyIndexCount = 0;
+        createInfo.pQueueFamilyIndices   = NULL;
+    }
+
+    createInfo.preTransform   = swapChainDetails.capabilities.currentTransform;
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    createInfo.presentMode    = swapChainConfigPresentMode;
+    createInfo.clipped        = VK_TRUE;
+    createInfo.oldSwapchain   = VK_NULL_HANDLE;
+
+    VkSwapchainKHR swapChain;
+    VkResult       swapChainCreateResult;
+    if ((swapChainCreateResult = vkCreateSwapchainKHR(device, &createInfo, NULL, &swapChain)) !=
+        VK_SUCCESS)
+    {
+        fprintf(stderr, "swapChain creation Error: %d.\n", swapChainCreateResult);
+        exit(EXIT_FAILURE);
+    }
+
+
+    /* swapChain Images ******************************************************/
+    uint32_t swapChainImagesCount;
+    vkGetSwapchainImagesKHR(device, swapChain, &swapChainImagesCount, NULL);
+    VkImage swapChainImages[swapChainImagesCount];
+    vkGetSwapchainImagesKHR(device, swapChain, &swapChainImagesCount, swapChainImages);
+
+
     /* window check **********************************************************/
     if (!window)
     {
@@ -461,19 +652,6 @@ int main(void)
         glfwTerminate();
         exit(EXIT_FAILURE);
     }
-
-
-    /* grapicsQueue **********************************************************/
-    VkQueue graphicsQueue;
-    vkGetDeviceQueue(device, devicePhysicalQueueGraphicsIndex, 0, &graphicsQueue);
-
-    /* TODO: actually check for present queue */
-    int32_t devicePhysicalQueuePresentIndex = devicePhysicalQueueGraphicsIndex;
-
-
-    /* present queue *********************************************************/
-    VkQueue presentQueue;
-    vkGetDeviceQueue(device, devicePhysicalQueuePresentIndex, 0, &presentQueue);
 
 
     /*************************************************************************/
@@ -502,6 +680,7 @@ int main(void)
             vkDestroyDebugUtilsMessengerEXT(instance, vkDebugUtilsMessengerEXT, NULL);
         }
     }
+    vkDestroySwapchainKHR(device, swapChain, NULL);
     vkDestroySurfaceKHR(instance, surface, NULL);
     vkDestroyDevice(device, NULL);
     vkDestroyInstance(instance, NULL);
