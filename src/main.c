@@ -25,8 +25,6 @@ VkBool32 vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT      messageSe
 
 int main(void)
 {
-
-
     /***************************************************************************/
     /*                                GLFW Init                                */
     /***************************************************************************/
@@ -270,26 +268,31 @@ int main(void)
 
     /* physical device queues ************************************************/
 
-    uint32_t devicePhysicalQueueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(devicePhysical, &devicePhysicalQueueFamilyCount, NULL);
-
-    printf("found %d physical device queue families\n", devicePhysicalQueueFamilyCount);
-
-    VkQueueFamilyProperties devicePhysicalQueueFamilies[devicePhysicalQueueFamilyCount];
+    uint32_t devicePhysicalQueueGraphicsFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(
-        devicePhysical, &devicePhysicalQueueFamilyCount, devicePhysicalQueueFamilies);
+        devicePhysical, &devicePhysicalQueueGraphicsFamilyCount, NULL);
 
-    int32_t devicePhysicalQueueIndex = -1;
-    for (uint32_t i = 0; i < devicePhysicalQueueFamilyCount; ++i)
+    printf("found %d physical device queue families\n", devicePhysicalQueueGraphicsFamilyCount);
+
+    VkQueueFamilyProperties
+        devicePhysicalQueueGraphicsFamilies[devicePhysicalQueueGraphicsFamilyCount];
+    vkGetPhysicalDeviceQueueFamilyProperties(devicePhysical,
+                                             &devicePhysicalQueueGraphicsFamilyCount,
+                                             devicePhysicalQueueGraphicsFamilies);
+
+    int32_t devicePhysicalQueueGraphicsIndex = -1;
+    for (uint32_t i = 0; i < devicePhysicalQueueGraphicsFamilyCount; ++i)
     {
-        if (devicePhysicalQueueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+        /* VkBool32 presentSupport = false; */
+        /* vkGetPhysicalDeviceSurfaceSupportKHR(devicePhysical, i, surface, &presentSupport); */
+        if (devicePhysicalQueueGraphicsFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
         {
-            devicePhysicalQueueIndex = i;
+            devicePhysicalQueueGraphicsIndex = i;
             break;
         }
     }
 
-    printf("using physical device queue with index %d\n", devicePhysicalQueueIndex);
+    printf("using physical device queue with index %d\n", devicePhysicalQueueGraphicsIndex);
 
 
     /* device ****************************************************************/
@@ -299,7 +302,7 @@ int main(void)
     /* queue info */
     VkDeviceQueueCreateInfo deviceQueueCreateInfo = {};
     deviceQueueCreateInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    deviceQueueCreateInfo.queueFamilyIndex        = devicePhysicalQueueIndex;
+    deviceQueueCreateInfo.queueFamilyIndex        = devicePhysicalQueueGraphicsIndex;
     deviceQueueCreateInfo.queueCount              = 1;
 
     float deviceQueuePriority = 1.0f;
@@ -340,25 +343,42 @@ int main(void)
     /* grapicsQueue **********************************************************/
 
     VkQueue graphicsQueue;
-    vkGetDeviceQueue(device, devicePhysicalQueueIndex, 0, &graphicsQueue);
+    vkGetDeviceQueue(device, devicePhysicalQueueGraphicsIndex, 0, &graphicsQueue);
 
 
     /*************************************************************************/
-    /*                                 Window                                */
+    /*                            Surface & Window                           */
     /*************************************************************************/
-
-
-    /* window setup **********************************************************/
+    /* surface ***************************************************************/
+    VkSurfaceKHR surface;
 
     glfwDefaultWindowHints();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, NULL, NULL);
+
+    VkResult surfaceCreateResult;
+    if ((surfaceCreateResult = glfwCreateWindowSurface(instance, window, NULL, &surface)) !=
+        VK_SUCCESS)
+    {
+        fprintf(stderr, "Vulkan Surface Creation Error: %d.\n", surfaceCreateResult);
+        exit(EXIT_FAILURE);
+    }
+
+    /* TODO: actually check for present queue */
+    int32_t devicePhysicalQueuePresentIndex = devicePhysicalQueueGraphicsIndex;
+
+    /* present queue *********************************************************/
+    VkQueue presentQueue;
+    vkGetDeviceQueue(device, devicePhysicalQueuePresentIndex, 0, &presentQueue);
+
+    /* window check **********************************************************/
     if (!window)
     {
         /* XXX:  missing validation layer destruction  */
         /* TODO: implement deconstructor  */
+        vkDestroySurfaceKHR(instance, surface, NULL);
         vkDestroyDevice(device, NULL);
         vkDestroyInstance(instance, NULL);
         glfwTerminate();
@@ -387,6 +407,7 @@ int main(void)
             vkDestroyDebugUtilsMessengerEXT(instance, vkDebugUtilsMessengerEXT, NULL);
         }
     }
+    vkDestroySurfaceKHR(instance, surface, NULL);
     vkDestroyDevice(device, NULL);
     vkDestroyInstance(instance, NULL);
     glfwDestroyWindow(window);
