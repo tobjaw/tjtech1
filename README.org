@@ -1,0 +1,28 @@
+#+TITLE: tjtech1
+
+C + GLFW + Vulkan = 1000 LOC to render a triangle
+
+[[docs/assets/demo-triangle.png?raw=true]]
+
+Adapted to C from the excellent [[https://vulkan-tutorial.com/][vulkan-tutorial]].
+One day™, this shall be a basic 3D game engine.
+
+* Build
+Currently only confirmed working on macOS =10.14=.
+** Requirements
+- =CMake= (tested with version =3.13.1=)
+- =clang= (tested with version =clang-1000.11.45.5=)
+- [[https://vulkan.lunarg.com/][Vulkan SDK]] (tested with version =1.1.92.1=)
+
+Vulkan exports need to be available:
+#+begin_src sh
+export VULKAN_SDK="/path/to/vulkan-sdk/macOS"
+export VK_LAYER_PATH="${VULKAN_SDK}/etc/vulkan/explicit_layer.d"
+export VK_ICD_FILENAMES="${VULKAN_SDK}/etc/vulkan/icd.d/MoltenVK_icd.json"
+export DYLD_LIBRARY_PATH="${VULKAN_SDK}/lib:${DYLD_LIBRARY_PATH}"
+PATH="${VULKAN_SDK}/bin:$PATH"
+#+end_src
+** Build
+1. =(cd build && cmake ..)=
+2. =(cd build && make)=
+3. =./build/tjtech1=
