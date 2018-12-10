@@ -919,6 +919,33 @@ int main(void)
         exit(EXIT_FAILURE);
     }
 
+
+    /*************************************************************************/
+    /*                              framebuffer                              */
+    /*************************************************************************/
+    VkFramebuffer swapChainFramebuffers[swapChainImagesCount];
+    for (size_t i = 0; i < swapChainImagesCount; ++i)
+    {
+        VkImageView attachments[] = {swapChainImageViews[i]};
+
+        VkFramebufferCreateInfo framebufferInfo = {};
+        framebufferInfo.sType                   = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass              = renderPass;
+        framebufferInfo.attachmentCount         = 1;
+        framebufferInfo.pAttachments            = attachments;
+        framebufferInfo.width                   = swapChainConfigExtent.width;
+        framebufferInfo.height                  = swapChainConfigExtent.height;
+        framebufferInfo.layers                  = 1;
+
+        if (vkCreateFramebuffer(device, &framebufferInfo, NULL, &swapChainFramebuffers[i]) !=
+            VK_SUCCESS)
+        {
+            fprintf(stderr, "framebuffer create error\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+
     /* window check **********************************************************/
     if (!window)
     {
@@ -957,6 +984,12 @@ int main(void)
         {
             vkDestroyDebugUtilsMessengerEXT(instance, vkDebugUtilsMessengerEXT, NULL);
         }
+    }
+
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        VkFramebuffer frameBuffer = swapChainFramebuffers[i];
+        vkDestroyFramebuffer(device, frameBuffer, NULL);
     }
     vkDestroyPipeline(device, graphicsPipeline, NULL);
     vkDestroyPipelineLayout(device, pipelineLayout, NULL);
