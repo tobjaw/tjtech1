@@ -893,6 +893,32 @@ int main(void)
         exit(EXIT_FAILURE);
     }
 
+    VkGraphicsPipelineCreateInfo pipelineInfo = {};
+    pipelineInfo.sType                        = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount                   = 2;
+    pipelineInfo.pStages                      = shaderStages;
+    pipelineInfo.pVertexInputState            = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState          = &inputAssembly;
+    pipelineInfo.pViewportState               = &viewportState;
+    pipelineInfo.pRasterizationState          = &rasterizer;
+    pipelineInfo.pMultisampleState            = &multisampling;
+    pipelineInfo.pDepthStencilState           = NULL;    // Optional
+    pipelineInfo.pColorBlendState             = &colorBlending;
+    pipelineInfo.pDynamicState                = NULL;    // Optional
+    pipelineInfo.layout                       = pipelineLayout;
+    pipelineInfo.renderPass                   = renderPass;
+    pipelineInfo.subpass                      = 0;
+    pipelineInfo.basePipelineHandle           = VK_NULL_HANDLE;    // Optional
+    pipelineInfo.basePipelineIndex            = -1;                // Optional
+
+    VkPipeline graphicsPipeline;
+    if (vkCreateGraphicsPipelines(
+            device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &graphicsPipeline) != VK_SUCCESS)
+    {
+        fprintf(stderr, "pipeline create error\n");
+        exit(EXIT_FAILURE);
+    }
+
     /* window check **********************************************************/
     if (!window)
     {
@@ -932,7 +958,7 @@ int main(void)
             vkDestroyDebugUtilsMessengerEXT(instance, vkDebugUtilsMessengerEXT, NULL);
         }
     }
-
+    vkDestroyPipeline(device, graphicsPipeline, NULL);
     vkDestroyPipelineLayout(device, pipelineLayout, NULL);
     vkDestroyRenderPass(device, renderPass, NULL);
     for (uint32_t i = 0; i < 2; ++i)
