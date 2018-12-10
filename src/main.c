@@ -641,6 +641,40 @@ int main(void)
     vkGetSwapchainImagesKHR(device, swapChain, &swapChainImagesCount, swapChainImages);
 
 
+    /* swapChainImageViews ***************************************************/
+    VkImageView swapChainImageViews[swapChainImagesCount];
+    for (uint32_t i = 0; i < swapChainImagesCount; ++i)
+    {
+        VkImage swapChainImage = swapChainImages[i];
+
+        VkImageViewCreateInfo createInfo = {};
+        createInfo.sType                 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        createInfo.image                 = swapChainImage;
+
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.format   = swapChainConfigFormat.format;
+
+        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+        createInfo.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        createInfo.subresourceRange.baseMipLevel   = 0;
+        createInfo.subresourceRange.levelCount     = 1;
+        createInfo.subresourceRange.baseArrayLayer = 0;
+        createInfo.subresourceRange.layerCount     = 1;
+
+        VkResult imageViewCreateResult;
+        if ((imageViewCreateResult = vkCreateImageView(
+                 device, &createInfo, NULL, &swapChainImageViews[i])) != VK_SUCCESS)
+        {
+            fprintf(stderr, "imageView creation Error: %d.\n", imageViewCreateResult);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+
     /* window check **********************************************************/
     if (!window)
     {
@@ -679,6 +713,11 @@ int main(void)
         {
             vkDestroyDebugUtilsMessengerEXT(instance, vkDebugUtilsMessengerEXT, NULL);
         }
+    }
+    for (uint32_t i = 0; i < swapChainImagesCount; ++i)
+    {
+        VkImageView imageView = swapChainImageViews[i];
+        vkDestroyImageView(device, imageView, NULL);
     }
     vkDestroySwapchainKHR(device, swapChain, NULL);
     vkDestroySurfaceKHR(instance, surface, NULL);
