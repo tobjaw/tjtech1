@@ -7,6 +7,29 @@
 #include <stdlib.h>
 #include <string.h>
 
+int ae_load_file_to_memory(const char* filename, char** result)
+{
+    int   size = 0;
+    FILE* f    = fopen(filename, "rb");
+    if (f == NULL)
+    {
+        *result = NULL;
+        return -1;    // -1 means file opening fail
+    }
+    fseek(f, 0, SEEK_END);
+    size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    *result = (char*) malloc(size + 1);
+    if (size != fread(*result, sizeof(char), size, f))
+    {
+        free(*result);
+        return -2;    // -2 means file reading fail
+    }
+    fclose(f);
+    (*result)[size] = 0;
+    return size;
+}
+
 void error_glfw_callback(int error, const char* description)
 {
     fprintf(stderr, "Error (%d): %s\n", error, description);
@@ -591,43 +614,43 @@ int main(void)
         imageCount = swapChainDetails.capabilities.maxImageCount;
     }
 
-    VkSwapchainCreateInfoKHR createInfo = {};
-    createInfo.sType                    = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface                  = surface;
+    VkSwapchainCreateInfoKHR swapChainCreateInfo = {};
+    swapChainCreateInfo.sType                    = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    swapChainCreateInfo.surface                  = surface;
 
-    createInfo.minImageCount    = imageCount;
-    createInfo.imageFormat      = swapChainConfigFormat.format;
-    createInfo.imageColorSpace  = swapChainConfigFormat.colorSpace;
-    createInfo.imageExtent      = swapChainConfigExtent;
-    createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapChainCreateInfo.minImageCount    = imageCount;
+    swapChainCreateInfo.imageFormat      = swapChainConfigFormat.format;
+    swapChainCreateInfo.imageColorSpace  = swapChainConfigFormat.colorSpace;
+    swapChainCreateInfo.imageExtent      = swapChainConfigExtent;
+    swapChainCreateInfo.imageArrayLayers = 1;
+    swapChainCreateInfo.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
     if (devicePhysicalQueueGraphicsIndex != devicePhysicalQueuePresentIndex)
     {
         uint32_t pQueueFamilyIndices[2];
-        pQueueFamilyIndices[0]           = devicePhysicalQueueGraphicsIndex;
-        pQueueFamilyIndices[1]           = devicePhysicalQueuePresentIndex;
-        createInfo.pQueueFamilyIndices   = pQueueFamilyIndices;
-        createInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
-        createInfo.queueFamilyIndexCount = 2;
+        pQueueFamilyIndices[0]                    = devicePhysicalQueueGraphicsIndex;
+        pQueueFamilyIndices[1]                    = devicePhysicalQueuePresentIndex;
+        swapChainCreateInfo.pQueueFamilyIndices   = pQueueFamilyIndices;
+        swapChainCreateInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
+        swapChainCreateInfo.queueFamilyIndexCount = 2;
     }
     else
     {
-        createInfo.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
-        createInfo.queueFamilyIndexCount = 0;
-        createInfo.pQueueFamilyIndices   = NULL;
+        swapChainCreateInfo.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
+        swapChainCreateInfo.queueFamilyIndexCount = 0;
+        swapChainCreateInfo.pQueueFamilyIndices   = NULL;
     }
 
-    createInfo.preTransform   = swapChainDetails.capabilities.currentTransform;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.presentMode    = swapChainConfigPresentMode;
-    createInfo.clipped        = VK_TRUE;
-    createInfo.oldSwapchain   = VK_NULL_HANDLE;
+    swapChainCreateInfo.preTransform   = swapChainDetails.capabilities.currentTransform;
+    swapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    swapChainCreateInfo.presentMode    = swapChainConfigPresentMode;
+    swapChainCreateInfo.clipped        = VK_TRUE;
+    swapChainCreateInfo.oldSwapchain   = VK_NULL_HANDLE;
 
     VkSwapchainKHR swapChain;
     VkResult       swapChainCreateResult;
-    if ((swapChainCreateResult = vkCreateSwapchainKHR(device, &createInfo, NULL, &swapChain)) !=
-        VK_SUCCESS)
+    if ((swapChainCreateResult =
+             vkCreateSwapchainKHR(device, &swapChainCreateInfo, NULL, &swapChain)) != VK_SUCCESS)
     {
         fprintf(stderr, "swapChain creation Error: %d.\n", swapChainCreateResult);
         exit(EXIT_FAILURE);
@@ -675,6 +698,69 @@ int main(void)
     }
 
 
+    /* pipeline **************************************************************/
+    char* vertShaderCode;
+    char* fragShaderCode;
+
+    uint32_t vertShaderCodeLength =
+        ae_load_file_to_memory("/data/dev/tjtech1/shaders/vert.spv", &vertShaderCode);
+    uint32_t fragShaderCodeLength =
+        ae_load_file_to_memory("/data/dev/tjtech1/shaders/frag.spv", &fragShaderCode);
+
+    if (!(vertShaderCodeLength > 0 && fragShaderCodeLength > 0))
+    {
+        fprintf(stderr, "shader load error\n");
+        exit(EXIT_FAILURE);
+    }
+
+    struct ShaderCode
+    {
+        uint32_t length;
+        char*    shader;
+    } shaderCodes[2];
+
+    shaderCodes[0].length = vertShaderCodeLength;
+    shaderCodes[0].shader = vertShaderCode;
+    shaderCodes[1].length = fragShaderCodeLength;
+    shaderCodes[1].shader = fragShaderCode;
+
+    VkShaderModule shaderModules[2];
+
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        struct ShaderCode        shaderCode             = shaderCodes[i];
+        VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
+        shaderModuleCreateInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        shaderModuleCreateInfo.codeSize = shaderCode.length;
+        shaderModuleCreateInfo.pCode    = ((uint32_t*) (shaderCode.shader));
+
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(device, &shaderModuleCreateInfo, NULL, &shaderModule) !=
+            VK_SUCCESS)
+        {
+
+            fprintf(stderr, "shaderModule create error\n");
+            exit(EXIT_FAILURE);
+        }
+        shaderModules[i] = shaderModule;
+    }
+
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+
+    vertShaderStageInfo.module = shaderModules[0];
+    vertShaderStageInfo.pName  = "main";
+
+    VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+    fragShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.module = shaderModules[1];
+    fragShaderStageInfo.pName  = "main";
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+
     /* window check **********************************************************/
     if (!window)
     {
@@ -713,6 +799,12 @@ int main(void)
         {
             vkDestroyDebugUtilsMessengerEXT(instance, vkDebugUtilsMessengerEXT, NULL);
         }
+    }
+
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        VkShaderModule shaderModule = shaderModules[i];
+        vkDestroyShaderModule(device, shaderModule, NULL);
     }
     for (uint32_t i = 0; i < swapChainImagesCount; ++i)
     {
