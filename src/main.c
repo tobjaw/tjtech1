@@ -758,9 +758,9 @@ int main(void)
     char* fragShaderCode;
 
     uint32_t vertShaderCodeLength =
-        ae_load_file_to_memory("/data/dev/tjtech1/shaders/vert.spv", &vertShaderCode);
+        ae_load_file_to_memory("shaders/shader.vert.spv", &vertShaderCode);
     uint32_t fragShaderCodeLength =
-        ae_load_file_to_memory("/data/dev/tjtech1/shaders/frag.spv", &fragShaderCode);
+        ae_load_file_to_memory("shaders/shader.frag.spv", &fragShaderCode);
 
     if (!(vertShaderCodeLength > 0 && fragShaderCodeLength > 0))
     {
