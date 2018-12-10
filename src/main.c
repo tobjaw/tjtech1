@@ -726,14 +726,14 @@ int main(void)
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments    = &colorAttachmentRef;
 
-    VkRenderPassCreateInfo renderPassInfo = {};
-    renderPassInfo.sType                  = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount        = 1;
-    renderPassInfo.pAttachments           = &colorAttachment;
-    renderPassInfo.subpassCount           = 1;
-    renderPassInfo.pSubpasses             = &subpass;
+    VkRenderPassCreateInfo renderPassCreateInfo = {};
+    renderPassCreateInfo.sType                  = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassCreateInfo.attachmentCount        = 1;
+    renderPassCreateInfo.pAttachments           = &colorAttachment;
+    renderPassCreateInfo.subpassCount           = 1;
+    renderPassCreateInfo.pSubpasses             = &subpass;
 
-    if (vkCreateRenderPass(device, &renderPassInfo, NULL, &renderPass) != VK_SUCCESS)
+    if (vkCreateRenderPass(device, &renderPassCreateInfo, NULL, &renderPass) != VK_SUCCESS)
     {
         fprintf(stderr, "pipeline layout create error\n");
         exit(EXIT_FAILURE);
@@ -945,6 +945,81 @@ int main(void)
         }
     }
 
+    /*************************************************************************/
+    /*                              commandPool                              */
+    /*************************************************************************/
+    VkCommandPool commandPool;
+
+    VkCommandPoolCreateInfo poolInfo = {};
+    poolInfo.sType                   = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.queueFamilyIndex        = devicePhysicalQueueGraphicsIndex;
+    poolInfo.flags                   = 0;    // Optional
+
+    if (vkCreateCommandPool(device, &poolInfo, NULL, &commandPool) != VK_SUCCESS)
+    {
+        fprintf(stderr, "commandPool create error\n");
+        exit(EXIT_FAILURE);
+    }
+
+
+    /*************************************************************************/
+    /*                             commandBuffer                             */
+    /*************************************************************************/
+    /* allocate **************************************************************/
+    VkCommandBuffer commandBuffers[swapChainImagesCount];
+
+    VkCommandBufferAllocateInfo allocInfo = {};
+    allocInfo.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool                 = commandPool;
+    allocInfo.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount          = swapChainImagesCount;
+
+    if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers) != VK_SUCCESS)
+    {
+        fprintf(stderr, "commandBuffer allocate error\n");
+        exit(EXIT_FAILURE);
+    }
+
+    /* record ****************************************************************/
+    for (size_t i = 0; i < swapChainImagesCount; i++)
+    {
+        VkCommandBufferBeginInfo beginInfo = {};
+        beginInfo.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags                    = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+        beginInfo.pInheritanceInfo         = NULL;    // Optional
+
+        if (vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS)
+        {
+            fprintf(stderr, "commandBuffer record start error\n");
+            exit(EXIT_FAILURE);
+        }
+
+        /* render pass begin */
+        VkRenderPassBeginInfo renderPassBeginInfo = {};
+        renderPassBeginInfo.sType                 = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassBeginInfo.renderPass            = renderPass;
+        renderPassBeginInfo.framebuffer           = swapChainFramebuffers[i];
+
+        renderPassBeginInfo.renderArea.offset.x = 0;
+        renderPassBeginInfo.renderArea.offset.y = 0;
+        renderPassBeginInfo.renderArea.extent   = swapChainConfigExtent;
+
+        VkClearValue clearColor             = {0.0f, 0.0f, 0.0f, 1.0f};
+        renderPassBeginInfo.clearValueCount = 1;
+        renderPassBeginInfo.pClearValues    = &clearColor;
+
+        vkCmdBeginRenderPass(commandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+        vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+        vkCmdEndRenderPass(commandBuffers[i]);
+
+        if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS)
+        {
+            fprintf(stderr, "commandBuffer record end error\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
 
     /* window check **********************************************************/
     if (!window)
@@ -986,6 +1061,7 @@ int main(void)
         }
     }
 
+    vkDestroyCommandPool(device, commandPool, NULL);
     for (uint32_t i = 0; i < 2; ++i)
     {
         VkFramebuffer frameBuffer = swapChainFramebuffers[i];
