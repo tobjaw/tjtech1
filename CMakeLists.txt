@@ -14,7 +14,7 @@ set(DIR_SRC "${DIR_ROOT}/src")
 set(DIR_VENDOR "${DIR_ROOT}/vendor")
 set(DIR_GLFW "${DIR_VENDOR}/glfw")
 
-set(SOURCES "${DIR_SRC}/main.c")
+set(SOURCES "${DIR_SRC}/main.c" "${DIR_SRC}/util.c")
 
 add_executable(${FILE_TARGET} ${SOURCES})
 target_include_directories(${FILE_TARGET} PRIVATE "${DIR_SRC}")
