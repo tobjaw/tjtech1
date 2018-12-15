@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.6)
-cmake_policy(SET CMP0079 NEW)
+if (POLICY CMP0079)
+  cmake_policy(SET CMP0079 OLD)
+endif()
 
 # project #####################################################################
 project(tjtech1
@@ -41,15 +43,16 @@ target_compile_options(CompilerErrors_Low INTERFACE
     $<$<C_COMPILER_ID:MSVC>:/W1>
 )
 # make interface available for includes
-install(
-  TARGETS CompilerErrors_Low
-  EXPORT CompilerErrors_Low
-)
-install(
-  EXPORT CompilerErrors_Low
-  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/${SHADER}
-)
-
+if (POLICY CMP0079)
+  install(
+    TARGETS CompilerErrors_Low
+    EXPORT CompilerErrors_Low
+  )
+  install(
+    EXPORT CompilerErrors_Low
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/${SHADER}
+  )
+endif()
 
 # src #########################################################################
 message("src")
@@ -74,9 +77,11 @@ target_link_libraries(tjtech1
 )
 target_include_directories(tjtech1 SYSTEM PUBLIC "vendor/glfw/include")
 target_compile_definitions(tjtech1 PUBLIC "GLFW_INCLUDE_NONE")
-target_link_libraries(glfw
-  PUBLIC CompilerErrors::Low
-)
+if (POLICY CMP0079)
+  target_link_libraries(glfw
+    PUBLIC CompilerErrors::Low
+  )
+endif()
 
 # Vulkan
 message("inc/Vulkan")
